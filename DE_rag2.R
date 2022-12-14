@@ -1,27 +1,27 @@
 library(edgeR)            #3.34.1
 library(ggfortify)        #0.4.13
-library(ggplot2)          #3.3.5
+library(ggplot2)          #3.3.6
 library(stats)            #4.1.1
 library(factoextra)       #1.0.7
 library(ggConvexHull)     #0.1.0
-library(gridExtra)
+library(gridExtra)        #2.3
 library(clusterProfiler)  #4.0.5
-library(org.Hs.eg.db)
+library(org.Hs.eg.db)     #3.13.0
 library(ComplexHeatmap)   #2.8.0
-library(ggrepel)
-library(reshape2)
-library(ggpubr)
-library(tidyr)
-library(cowplot)
+library(ggrepel)          #0.9.1    
+library(reshape2)         #1.4.4
+library(ggpubr)           #0.4.0
+library(tidyr)            #1.2.0
+library(cowplot)          #1.1.1
 
 WTcol = '#83deb5'
 RAGcol = '#00203fff'
 
 # sources----
-path <- 'C:/Users/tehil/Dropbox/Projects/Rag2/'
-expressionPath <- 'rag2_matrix_expression_RNAseq_star2206.csv' 
+path <- 'Rag2/'
+expressionPath <- 'rag2_matrix_expression_RNAseq.csv' 
 sampleInfoPath <- 'infoTable.csv'
-humanKfConversion = read.table( "C:/Users/tehil/Dropbox/Projects/NCBI-Human-orthologs.txt", head = T, sep = "\t")
+humanKfConversion = read.table( "NCBI-Human-orthologs.txt", head = T, sep = "\t")
 
 #function
 createDEGobject <- function(path, expPath, infoPath){
@@ -102,35 +102,11 @@ dataExplorer <- function(DEobj, titleG='', logTag = T, clusterSamples = F){
     scale_color_manual(name='Group', values = c(WTcol, RAGcol))+
     scale_fill_manual(name='Group', values = c(WTcol, RAGcol))+
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
-  
-  "#PCA with dots
-  pcaD12 <- autoplot(pca.de, data = infoTable, colour = 'group', x=1, y=2,label =F,
-                     size = 2.5, title=titleG)+#, shape = 19
-    geom_convexhull(aes(fill = infoTable$group, color = infoTable$group, alpha=infoTable$group),
-                    show.legend = T)+
-    scale_color_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
-    scale_fill_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
-    scale_alpha_manual(name='Group', values = c(0.2,0.2,0,0))+
-    ggtitle(titleG)+
-    theme_bw()+
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
-  
-  pcaD13 <- autoplot(pca.de, data = infoTable, colour = 'group', x=1, y=3,label =F,
-                     size = 2.5, title=titleG)+#, shape = 19
-    geom_convexhull(aes(fill = infoTable$group, color = infoTable$group, alpha=infoTable$group),
-                    show.legend = T)+
-    scale_color_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
-    scale_fill_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
-    scale_alpha_manual(name='Group', values = c(0.2,0.2,0,0))+
-    ggtitle(titleG)+
-    theme_bw()+
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
-  
-  return(list(knee= fz, PCAlabels12 = pcaL12, PCAlabels13 = pcaL13, PCAdots12 = pcaD12, PCAdots13 = pcaD13))"
+ 
   return(list(knee= fz, PCAlabels12 = pcaL12, PCAlabels13 = pcaL13, jjj=pca.de))
 }
 convertLoc2symbol <- function(old_names){
-  names_ncbi <- read.csv('C:/Users/tehil/Dropbox/Projects/APRT/RNAseq/data/genes_names.csv')
+  names_ncbi <- read.csv('genes_names.csv')
   names(names_ncbi) <- c('NCBI', 'FinalSymbol', 'Human')
   head(names_ncbi)
   new_names <- names_ncbi[names_ncbi$NCBI %in% old_names,]
@@ -156,7 +132,7 @@ dev.off()
 
 
 # -------DE------
-# Differential expression analysis between ages, between genotypes and in the interaction between them in the three datasets
+# Differential expression analysis between the genotypes
 
 design <- model.matrix(~Genotype, data=DEobjRag2$samples)
 DEobjRag2 <- estimateDisp(DEobjRag2, design)
@@ -172,7 +148,7 @@ FDR <- top$FDR
 top <- merge(top, humanKfConversion, by.x='genes', by.y = 'ncbi', all.x = TRUE)
 
 
-#GO
+#GO enrichment
 enrichmentClusterProfile <- function(geneListHuman, folder, fileName, backgroundGeneList = 'none') {
   
   # geneListHuman: human gene list by Symbol annotation
@@ -234,18 +210,6 @@ barplotExpression <- function(gene, norma = TRUE){
           theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.text.y = element_text(color="black"), axis.text.x = element_text(color="black", angle=90))
   
-  
-  
-  #pvalsdf <- data.frame(matrix(0, ncol=5, nrow = 3))
-  #colnames(pvalsdf) <- c('group1', 'group2', 'p', 'p.adj', 'y.position')
-  #pvalsdf[1, c('group1', 'group2')] = unique(expressionG$groupWtest)[c(2*i-1,2*i)]
-  #pvalsdf[i, 'p'] <- wilcox.test(normExp ~ Genotype, data=expressionG)$p.value
-
-  #pvalsdf[, 'p.adj'] <- round(p.adjust(pvalsdf$p, method='fdr'), 4) 
-  
-  #pvalsdf$y.position <- 1.2
-      #stat_pvalue_manual(pvalsdf, label = 'p.adj', size = 4) +
-
   return(bars)
 }
 
@@ -292,9 +256,6 @@ write.csv(top[top$DE != 'NO',], paste0(path, 'DEgenesH.csv'))
 
 # GO visualization
 GOdots <- function(GOdata, chosenPathways, title="GO"){
-  #order the pathways according FDR or the original order
-  #  pathwaysOrder <- chosenPathways$Description
-  #
   
   GOdata <- separate(data = GOdata[chosenPathways,], col = GeneRatio, into = c("numerator", "denominator"), sep = "\\/")
   GOdata$numerator = as.numeric(GOdata$numerator)
@@ -303,15 +264,12 @@ GOdots <- function(GOdata, chosenPathways, title="GO"){
   GOdata$qvalue = as.numeric(GOdata$qvalue)
   
   GOdata$Description <- paste0(toupper(substr(GOdata$Description, 1, 1)), substr(GOdata$Description, 2, nchar(GOdata$Description)))
-  #pathwaysOrder <- paste0(toupper(substr(pathwaysOrder, 1, 1)), substr(pathwaysOrder, 2, nchar(pathwaysOrder)))
   GOdata$Description <- factor(GOdata$Description, levels = rev(GOdata$Description))
   
   dotplotGO <- ggplot(data = GOdata, aes(x = GeneRatio, y = Description, color= qvalue)) + 
     geom_point(aes( size = Count)) + 
     scale_size(range = c(min(GOdata$Count) +0.3, 6)) +
-    #  scale_color_gradient(low = "blue", high = "red") +
     scale_color_gradient(low = "red", high = "blue") +
-    #scale_shape_manual(values = c(19, 21) , breaks = waiver())+, limits = c(0,0.05)
     theme_bw() +
     ylab("") + 
     ggtitle(title)
