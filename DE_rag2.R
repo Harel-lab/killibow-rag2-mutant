@@ -15,13 +15,13 @@ library(tidyr)            #1.2.0
 library(cowplot)          #1.1.1
 
 WTcol = '#83deb5'
-RAGcol = '#00203fff'
+RAGcol = '#00203fff' 
 
 # sources----
-path <- 'Rag2/'
-expressionPath <- 'rag2_matrix_expression_RNAseq.csv' 
+path <- 'C:/Users/tehil/Dropbox/Projects/Rag2/'
+expressionPath <- 'rag2_matrix_expression_RNAseq_star2206.csv' 
 sampleInfoPath <- 'infoTable.csv'
-humanKfConversion = read.table( "NCBI-Human-orthologs.txt", head = T, sep = "\t")
+humanKfConversion = read.table( "C:/Users/tehil/Dropbox/Projects/NCBI-Human-orthologs.txt", head = T, sep = "\t")
 
 #function
 createDEGobject <- function(path, expPath, infoPath){
@@ -46,7 +46,7 @@ createDEGobject <- function(path, expPath, infoPath){
   infoTable <- infoTable[colnames(exMatrix),] # very important line!! order the info according the RNA-seq data; the first column in count table will be corresponded to the first row in sample table
   
   # create DGE object     
-  DEobj <- DGEList(exMatrix, samples = infoTable, group=paste(infoTable$Tissue, infoTable$Genotype, infoTable$mutaion),
+  DEobj <- DGEList(exMatrix, samples = infoTable, group=infoTable$Genotype,
                    genes = row.names(exMatrix))
   
   #DEobj <- DEobj[,order(DEobj$samples$genotype)]
@@ -102,11 +102,35 @@ dataExplorer <- function(DEobj, titleG='', logTag = T, clusterSamples = F){
     scale_color_manual(name='Group', values = c(WTcol, RAGcol))+
     scale_fill_manual(name='Group', values = c(WTcol, RAGcol))+
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
- 
+  
+  "#PCA with dots
+  pcaD12 <- autoplot(pca.de, data = infoTable, colour = 'group', x=1, y=2,label =F,
+                     size = 2.5, title=titleG)+#, shape = 19
+    geom_convexhull(aes(fill = infoTable$group, color = infoTable$group, alpha=infoTable$group),
+                    show.legend = T)+
+    scale_color_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
+    scale_fill_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
+    scale_alpha_manual(name='Group', values = c(0.2,0.2,0,0))+
+    ggtitle(titleG)+
+    theme_bw()+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
+  
+  pcaD13 <- autoplot(pca.de, data = infoTable, colour = 'group', x=1, y=3,label =F,
+                     size = 2.5, title=titleG)+#, shape = 19
+    geom_convexhull(aes(fill = infoTable$group, color = infoTable$group, alpha=infoTable$group),
+                    show.legend = T)+
+    scale_color_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
+    scale_fill_manual(name='Group', values = c('#1D71BB', '#E30613', '#1D71BB', '#E30613'))+
+    scale_alpha_manual(name='Group', values = c(0.2,0.2,0,0))+
+    ggtitle(titleG)+
+    theme_bw()+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio=1)
+  
+  return(list(knee= fz, PCAlabels12 = pcaL12, PCAlabels13 = pcaL13, PCAdots12 = pcaD12, PCAdots13 = pcaD13))"
   return(list(knee= fz, PCAlabels12 = pcaL12, PCAlabels13 = pcaL13, jjj=pca.de))
 }
 convertLoc2symbol <- function(old_names){
-  names_ncbi <- read.csv('genes_names.csv')
+  names_ncbi <- read.csv('C:/Users/tehil/Dropbox/Projects/genes_names.csv')
   names(names_ncbi) <- c('NCBI', 'FinalSymbol', 'Human')
   head(names_ncbi)
   new_names <- names_ncbi[names_ncbi$NCBI %in% old_names,]
@@ -119,7 +143,6 @@ convertLoc2symbol <- function(old_names){
 DEobj <- createDEGobject(path, expressionPath, sampleInfoPath)
 
 DEobjRag2 <- filterNormDEGobject(DEobj)
-
 dev.off()
 
 Rag2Graphs <- dataExplorer(DEobjRag2, 'Rag2')
@@ -132,23 +155,26 @@ dev.off()
 
 
 # -------DE------
-# Differential expression analysis between the genotypes
+# Differential expression analysis between ages, between genotypes and in the interaction between them in the three datasets
 
-design <- model.matrix(~Genotype, data=DEobjRag2$samples)
-DEobjRag2 <- estimateDisp(DEobjRag2, design)
-fit <- glmQLFit(DEobjRag2, design, robust = T)
-FC <- data.frame(row.names = row.names(DEobjRag2))
-FDR <- data.frame(row.names = row.names(DEobjRag2))
-
-qlf <- glmQLFTest(fit)
-top <- topTags(qlf, n=Inf)$table
-  
-FC <- top$logFC
-FDR <- top$FDR
+#design <- model.matrix(~Genotype, data=DEobjRag2$samples)
+DEobjRag2 <- estimateDisp(DEobjRag2)#), design)
+et <- exactTest(DEobjRag2)
+top <- topTags(et, n=Inf)$table
+top$mlog10QvalxFC <- -log10(top$FDR) * top$logFC
 top <- merge(top, humanKfConversion, by.x='genes', by.y = 'ncbi', all.x = TRUE)
 
+write.csv(top, paste(path, 'ranking list rag2 classic.csv'))
+write.csv(top[top$FDR <0.1, ], paste(path, 'ranking list rag2 classic 0.1.csv'))
 
-#GO enrichment
+dim(top[top$PValue < 0.05 & top$logFC > 0,])
+dim(top[top$PValue < 0.05 & top$logFC < 0,])
+
+dim(top[top$FDR < 0.05 & top$logFC > 0,])
+dim(top[top$FDR < 0.05 & top$logFC < 0,])
+head(top[order(top$FDR), ])
+
+#GO
 enrichmentClusterProfile <- function(geneListHuman, folder, fileName, backgroundGeneList = 'none') {
   
   # geneListHuman: human gene list by Symbol annotation
@@ -169,15 +195,16 @@ enrichmentClusterProfile <- function(geneListHuman, folder, fileName, background
                    ont          = c("ALL"),
                    pvalueCutoff = 1)
   
+  print(length(ego3))
   if (length(ego3) > 0)
     if (nrow(ego3) > 0)
       write.table(ego3, paste0(folder, fileName, "_GO.csv"), sep = ",", quote = T, row.names = F)
   return(ego3)
 }
 
-enrichmentClusterProfile(top[top$PValue < 0.05,]$human, path, 'GO_0.05', top$human)
-up = enrichmentClusterProfile(top[top$PValue < 0.05 & top$logFC > 1,]$human, path, 'GO_0.05_FC1_up', top$human)
-down = enrichmentClusterProfile(top[top$PValue < 0.05 & top$logFC < -1,]$human, path, 'GO_0.05_FC1_down', top$human)
+enrichmentClusterProfile(top[top$FDR < 0.05,]$human, path, 'GO_0.1', top$human)
+up = enrichmentClusterProfile(top[top$FDR < 0.05 & top$logFC > 1,]$human, path, 'GO_0.05_FC1_up', top$human)
+down = enrichmentClusterProfile(top[top$FDR < 0.05 & top$logFC < -1,]$human, path, 'GO_0.05_FC1_down', top$human)
 
 
 ## visualization ----
@@ -210,6 +237,18 @@ barplotExpression <- function(gene, norma = TRUE){
           theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.text.y = element_text(color="black"), axis.text.x = element_text(color="black", angle=90))
   
+  
+  
+  #pvalsdf <- data.frame(matrix(0, ncol=5, nrow = 3))
+  #colnames(pvalsdf) <- c('group1', 'group2', 'p', 'p.adj', 'y.position')
+  #pvalsdf[1, c('group1', 'group2')] = unique(expressionG$groupWtest)[c(2*i-1,2*i)]
+  #pvalsdf[i, 'p'] <- wilcox.test(normExp ~ Genotype, data=expressionG)$p.value
+
+  #pvalsdf[, 'p.adj'] <- round(p.adjust(pvalsdf$p, method='fdr'), 4) 
+  
+  #pvalsdf$y.position <- 1.2
+      #stat_pvalue_manual(pvalsdf, label = 'p.adj', size = 4) +
+
   return(bars)
 }
 
@@ -218,37 +257,45 @@ top <- merge(top, nameG[c('genes', 'name.in.the.paper')], by = 'genes', all.x = 
 top$FinalSymbol <- convertLoc2symbol(top$genes)
 write.csv(top, paste0(path, 'topDEG.csv'))
 
-upG = c('LOC107372328', 'LOC107379421', 'LOC107372326', 'LOC107374287', 'LOC107396271', 'LOC107376356')
-downG = c('LOC107376656', 'LOC107372482', 'LOC107394448', 'LOC107372866', 'LOC107379481', 'cd79a')
+upG = c('LOC107379421', 'LOC107397014', 'spry2', 'spry2', 'spry2')  #top[top$FDR < 0.05 & top$logFC > 1,]$genes   #
+downG =  c('LOC107372687', 'LOC107394448', 'LOC107394449', 'LOC107387651', 'LOC107372481') # top[top$FDR < 0.05 & top$logFC < -1,]$genes #
+
+downG = c('LOC107379421','LOC107374380') #'LOC129166898')
 
 upB = barplotExpression(upG)
 downB = barplotExpression(downG)
 
-pdf(paste0(path, '/figures/barplot.pdf'), width=4, height=6) 
+pdf(paste0(path, '/figures/barplot3.pdf'), width=5, height=7) 
 print(plot_grid(upB, downB, ncol = 1,align = "v"))
+#print(downB)
 dev.off()
 
+pdf(paste0(path, '/figures/barplot2up.pdf'), width=4, height=4) 
+#print(plot_grid(upB, downB, ncol = 1,align = "v"))
+print(upB)
+dev.off()
 
 #volcano
 top$DE = 'NO'
-top[top$PValue < 0.05 & top$logFC > 1,]$DE = 'up'
-top[top$PValue < 0.05 & top$logFC < -1,]$DE = 'down'
+
+top[top$FDR < 0.05 & top$logFC > 1,]$DE = 'up'
+top[top$FDR < 0.05 & top$logFC < -1,]$DE = 'down'
 top[!top$name.in.the.paper %in% NA,]$DE = 'Immune'
 
 top$labels <- NA
 top$labels = top$name.in.the.paper
 
-h = ggplot(data=top, aes(x=logFC, y=-log10(PValue), col=DE, label=labels)) + 
+h = ggplot(data=top, aes(x=logFC, y=-log10(FDR), col=DE, label=labels)) + 
       geom_point() + 
       geom_text_repel( max.overlaps = Inf) +
       #geom_text() +
       theme_classic() +
-      scale_color_manual(values=c(RAGcol, 'red', "gray", WTcol)) + 
+      scale_color_manual(values=c(RAGcol,  "gray", WTcol)) + #'red',
       geom_hline(yintercept=-log10(0.05), col="gray")+
       geom_vline(xintercept=c(-1, 1), col="gray")
       
 
-pdf(paste0(path, '/figures/volcano.pdf'), width=10, height=8) 
+pdf(paste0(path, '/figures/volcano2.pdf'), width=6, height=4) 
 print(h)
 dev.off()
 
@@ -256,6 +303,9 @@ write.csv(top[top$DE != 'NO',], paste0(path, 'DEgenesH.csv'))
 
 # GO visualization
 GOdots <- function(GOdata, chosenPathways, title="GO"){
+  #order the pathways according FDR or the original order
+  #  pathwaysOrder <- chosenPathways$Description
+  #
   
   GOdata <- separate(data = GOdata[chosenPathways,], col = GeneRatio, into = c("numerator", "denominator"), sep = "\\/")
   GOdata$numerator = as.numeric(GOdata$numerator)
@@ -264,12 +314,15 @@ GOdots <- function(GOdata, chosenPathways, title="GO"){
   GOdata$qvalue = as.numeric(GOdata$qvalue)
   
   GOdata$Description <- paste0(toupper(substr(GOdata$Description, 1, 1)), substr(GOdata$Description, 2, nchar(GOdata$Description)))
+  #pathwaysOrder <- paste0(toupper(substr(pathwaysOrder, 1, 1)), substr(pathwaysOrder, 2, nchar(pathwaysOrder)))
   GOdata$Description <- factor(GOdata$Description, levels = rev(GOdata$Description))
   
   dotplotGO <- ggplot(data = GOdata, aes(x = GeneRatio, y = Description, color= qvalue)) + 
     geom_point(aes( size = Count)) + 
     scale_size(range = c(min(GOdata$Count) +0.3, 6)) +
+    #  scale_color_gradient(low = "blue", high = "red") +
     scale_color_gradient(low = "red", high = "blue") +
+    #scale_shape_manual(values = c(19, 21) , breaks = waiver())+, limits = c(0,0.05)
     theme_bw() +
     ylab("") + 
     ggtitle(title)
